@@ -484,5 +484,5 @@ def build_citation_tree(root_arxiv_id, paper_title):
         return None
 
 ### Example Usage:
-# arxiv_id = get_arxiv_id(title)
-# citation_tree = build_citation_tree(root_arxiv_id, paper_title)
+# root_arxiv_id = get_arxiv_id(root_title)
+# citation_tree = build_citation_tree(root_arxiv_id, root_title)

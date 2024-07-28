@@ -19,6 +19,9 @@ import backoff
 #### Parse Json file
 def process_conferences(base_folder, output_folder):
     for conference_folder in os.listdir(base_folder):
+        if os.path.exists(f"{output_folder}/{conference_folder}.pt"):
+            print(f"Citation graph for '{conference_folder}' already exists. Skipping.")
+            continue
         if os.path.isdir(os.path.join(base_folder, conference_folder)):
             conference_graphs = process_conference(os.path.join(base_folder, conference_folder))
             save_graph(conference_graphs, output_folder, conference_folder)
@@ -347,8 +350,6 @@ def extract_reference_titles(arxiv_id, main_text):
                             cited_titles.extend(titles)
                     except UnicodeDecodeError:
                         print(f"Could not read file {ref_path} as UTF-8")
-                else:
-                    print(f"Referenced file not found: {ref_file}")
 
     except Exception as e:
         print(f"An error occurred while processing {arxiv_id}: {str(e)}")

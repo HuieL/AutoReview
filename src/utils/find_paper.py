@@ -19,9 +19,10 @@ import backoff
 #### Parse Json file
 def process_conferences(base_folder, output_folder):
     for conference_folder in os.listdir(base_folder):
+        print(conference_folder)
         if os.path.isdir(os.path.join(base_folder, conference_folder)):
             conference_graphs = process_conference(os.path.join(base_folder, conference_folder))
-            save_graph(conference_graphs, output_folder)
+            save_graph(conference_graphs, output_folder, conference_folder)
 
 def load_paper_info(file_path):
     with open(file_path, 'r') as f:
@@ -70,9 +71,9 @@ def process_conference(conference_folder):
 
     return graphs
 
-def save_graph(graphs, output_folder):
+def save_graph(graphs, output_folder, conference_folder):
     conference_graph = merge_graphs(graphs)
-    torch.save(conference_graph, output_folder)
+    torch.save(conference_graph, f"{output_folder}/{conference_folder}.pt")
 
 ### Utils to extract contents from arxiv
 @backoff.on_exception(backoff.expo, requests.exceptions.RequestException, max_tries=5)

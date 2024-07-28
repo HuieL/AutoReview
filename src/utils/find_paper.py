@@ -403,8 +403,7 @@ def get_arxiv_id(title, max_results=10, similarity_threshold=80):
     
 def get_arxiv_ids(titles):
     arxiv_ids = []
-    print("Processing id of references")
-    for title in tqdm(titles, desc="Searching for references", unit="title"):
+    for title in titles:
         try:
             arxiv_id = get_arxiv_id(title)
             arxiv_ids.append(arxiv_id)
@@ -419,7 +418,6 @@ def construct_citation_graph(root_arxiv_id, root_title, cited_titles, cited_arxi
 
     # Create a list of all valid arXiv IDs (including root) and their corresponding titles
     all_arxiv_ids = [root_arxiv_id] + list(valid_cited_ids)
-    print(f"Found cited papers on arxiv: {len(all_arxiv_ids)}/{len(cited_titles)+1}")
     all_titles = [root_title] + [cited_titles[i] for i in valid_indices]
 
     id_to_index = {id: i for i, id in enumerate(all_arxiv_ids)}

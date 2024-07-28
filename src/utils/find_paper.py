@@ -19,7 +19,6 @@ import backoff
 #### Parse Json file
 def process_conferences(base_folder, output_folder):
     for conference_folder in os.listdir(base_folder):
-        print(conference_folder)
         if os.path.isdir(os.path.join(base_folder, conference_folder)):
             conference_graphs = process_conference(os.path.join(base_folder, conference_folder))
             save_graph(conference_graphs, output_folder, conference_folder)
@@ -568,8 +567,10 @@ def merge_graphs(graphs):
 
     arxiv_id_to_index = {}
     current_index = 0
+    original_nodes = 0
 
     for graph in graphs:
+        original_nodes += len(graph.x[0])
         for i, arxiv_id in enumerate(graph.arxiv_ids):
             if arxiv_id not in arxiv_id_to_index:
                 arxiv_id_to_index[arxiv_id] = current_index
@@ -587,4 +588,6 @@ def merge_graphs(graphs):
             merged_data.edge_index.append([source, target])
 
     merged_data.edge_index = torch.tensor(merged_data.edge_index).t().contiguous()
+    merged_data.desc = f"""Merged graph statistics:\nOriginal total nodes before merging: {original_nodes}\nNumber of nodes: {merged_data.num_nodes}\nNumber of edges: {merged_data.num_edges}"""
+    
     return merged_data

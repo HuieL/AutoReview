@@ -23,7 +23,6 @@ def process_conferences(base_folder, output_folder):
             conference_graphs = process_conference(os.path.join(base_folder, conference_folder))
             save_graph(conference_graphs, output_folder)
 
-
 def load_paper_info(file_path):
     with open(file_path, 'r') as f:
         return json.load(f)

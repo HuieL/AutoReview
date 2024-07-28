@@ -1,23 +1,82 @@
 import requests
-from bs4 import BeautifulSoup
 import re
 import tarfile
 import os
+import glob
 import xml.etree.ElementTree as ET
 import urllib.parse
 import tempfile
 from fuzzywuzzy import fuzz
 import time
 import torch
+import json
 from torch_geometric.data import Data
-import ipdb
 from tqdm import tqdm
-from requests.exceptions import RequestException, ProxyError
-import gzip
+from requests.exceptions import RequestException
 import backoff
 
 
-@backoff.on_exception(backoff.expo, RequestException, max_tries=2)
+#### Parse Json file
+def process_conferences(base_folder, output_folder):
+    for conference_folder in os.listdir(base_folder):
+        if os.path.isdir(os.path.join(base_folder, conference_folder)):
+            conference_graphs = process_conference(os.path.join(base_folder, conference_folder))
+            save_graph(conference_graphs, output_folder)
+
+
+def load_paper_info(file_path):
+    with open(file_path, 'r') as f:
+        return json.load(f)
+    
+def load_review_info(file_path):
+    with open(file_path, 'r') as f:
+        review_data = json.load(f)
+        reviews = review_data.get('reviews', [])
+        return reviews
+
+def process_conference(conference_folder):
+    content_folder = os.path.join(conference_folder, f"{os.path.basename(conference_folder)}_content")
+    paper_folder = os.path.join(conference_folder, f"{os.path.basename(conference_folder)}_paper")
+    review_folder = os.path.join(conference_folder, f"{os.path.basename(conference_folder)}_review")
+    graphs = []
+
+    content_files = [f for f in os.listdir(content_folder) if f.endswith('_content.json')]
+    for file in tqdm(content_files, desc=f"Processing {os.path.basename(conference_folder)}", unit="paper"):
+        try:
+            if file.endswith('_content.json'):
+                paper_id = file.split('_content.json')[0]
+                paper_file = os.path.join(paper_folder, f"{paper_id}_paper.json")
+                review_file = os.path.join(review_folder, f"{paper_id}_review.json")
+
+                if not (os.path.exists(paper_file) and os.path.exists(review_file)):
+                    continue
+
+                paper_info = load_paper_info(paper_file)
+                reviews = load_review_info(review_file)
+
+                title = paper_info.get('title')
+                arxiv_id = get_arxiv_id(title)
+                
+                if not arxiv_id:
+                    continue
+
+                graph = build_citation_tree_with_ids(arxiv_id, title)
+                
+                if graph is not None:
+                    graph.comment = [reviews] + [None] * (len(graph.arxiv_ids) - 1)
+                    graph.decision = [paper_info.get('decision')] + [None] * (len(graph.arxiv_ids) - 1)
+                    graphs.append(graph)
+        except: 
+            continue
+
+    return graphs
+
+def save_graph(graphs, output_folder):
+    conference_graph = merge_graphs(graphs)
+    torch.save(conference_graph, output_folder)
+
+### Utils to extract contents from arxiv
+@backoff.on_exception(backoff.expo, requests.exceptions.RequestException, max_tries=5)
 def download_arxiv_source(arxiv_id):
     url = f"https://arxiv.org/e-print/{arxiv_id}"
     response = requests.get(url, stream=True)
@@ -75,7 +134,7 @@ def find_main_tex_file(directory):
         for file in files:
             if file.endswith(".tex"):
                 tex_files.append(os.path.join(root, file))
-    
+
     if not tex_files:
         return None
     
@@ -84,12 +143,20 @@ def find_main_tex_file(directory):
     if main_file_candidates:
         return main_file_candidates[0]
     
-    # If no obvious main file, check for \documentclass and \begin{document}
     for file in tex_files:
-        with open(file, 'r', encoding='utf-8') as f:
-            content = f.read()
-            if '\\documentclass' in content and '\\begin{document}' in content:
-                return file
+        try:
+            with open(file, 'r', encoding='utf-8') as f:
+                content = f.read()
+                if '\\documentclass' in content and '\\begin{document}' in content:
+                    return file
+        except UnicodeDecodeError:
+            try:
+                with open(file, 'r', encoding='latin-1') as f:
+                    content = f.read()
+                    if '\\documentclass' in content and '\\begin{document}' in content:
+                        return file
+            except Exception:
+                print(f"Unable to read file: {file}")
     
     # If still not found, return the largest .tex file
     return max(tex_files, key=os.path.getsize)
@@ -149,12 +216,8 @@ def get_arxiv_abstract(arxiv_id):
         print(f"Error fetching abstract for {arxiv_id}: {str(e)}")
     return None
 
-def get_arxiv_id_from_url(paper_url):
-    _, arxiv_url = extract_paper_info(paper_url)
-    return arxiv_url.split('/')[-1]
 
-############### Scripts to get references
-
+############### Utils to get references
 def process_input_commands(content, base_dir):
     def replace_input(match):
         input_file = match.group(1)
@@ -162,9 +225,13 @@ def process_input_commands(content, base_dir):
             input_file += '.tex'
         input_path = os.path.join(base_dir, input_file)
         if os.path.exists(input_path):
-            with open(input_path, 'r', encoding='utf-8', errors='ignore') as f:
-                return process_input_commands(f.read(), os.path.dirname(input_path))
-        return ''  # If file not found, replace with empty string
+            try:
+                with open(input_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    return process_input_commands(f.read(), os.path.dirname(input_path))
+            except Exception as e:
+                print(f"Error processing input file {input_path}: {str(e)}")
+                return ''
+        return ''
 
     # Replace all \input commands with their file contents
     processed_content = re.sub(r'\\input\{([^}]+)\}', replace_input, content)
@@ -189,7 +256,6 @@ def parse_bib_content(bib_content):
             title_match = re.search(r'title\s*=\s*["{](.+?)["}]', entry, re.DOTALL | re.IGNORECASE)
             if title_match:
                 title = title_match.group(1).strip()
-                # Remove any newlines and extra spaces from the title
                 title = re.sub(r'\s+', ' ', title)
                 titles.append(title)
     
@@ -202,8 +268,6 @@ def parse_bbl_content(bbl_content):
     for entry in entries:
         # Remove any newline characters and extra spaces
         entry = re.sub(r'\s+', ' ', entry).strip()
-        
-        # Try to find the title
         title = None
         
         # Look for patterns that typically indicate a title
@@ -345,14 +409,12 @@ def get_arxiv_ids(titles):
         try:
             arxiv_id = get_arxiv_id(title)
             arxiv_ids.append(arxiv_id)
-            time.sleep(1)  # Respect arXiv's rate limit, increased to 3 seconds
-        except Exception as e:
+            time.sleep(1) 
+        except Exception:
             arxiv_ids.append(None)
     return arxiv_ids
 
-############### Utils to build up graphs and record text info of these papers
 def construct_citation_graph(root_arxiv_id, root_title, cited_titles, cited_arxiv_ids):
-    # Filter out None values from cited_arxiv_ids and keep track of valid indices
     valid_cited = [(i, id) for i, id in enumerate(cited_arxiv_ids) if id is not None]
     valid_indices, valid_cited_ids = zip(*valid_cited) if valid_cited else ([], [])
 
@@ -361,25 +423,14 @@ def construct_citation_graph(root_arxiv_id, root_title, cited_titles, cited_arxi
     print(f"Found cited papers on arxiv: {len(all_arxiv_ids)}/{len(cited_titles)+1}")
     all_titles = [root_title] + [cited_titles[i] for i in valid_indices]
 
-    # Create a mapping from arXiv ID to node index
     id_to_index = {id: i for i, id in enumerate(all_arxiv_ids)}
-
-    # Create node features (optional, you can modify this as needed)
-    num_nodes = len(all_arxiv_ids)
-    node_features = torch.eye(num_nodes)  # One-hot encoding for each node
-
-    # Create edge index
     edge_index = [[0, id_to_index[id]] for id in valid_cited_ids]
     edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
 
     # Create the PyG Data object
-    data = Data(x=node_features, edge_index=edge_index)
-
-    # Add arXiv IDs and titles as additional attributes
+    data = Data(edge_index=edge_index)
     data.arxiv_ids = all_arxiv_ids
     data.titles = all_titles
-
-    # Add a mapping from original citation index to new graph index
     data.citation_to_graph_index = {i: id_to_index[id] for i, id in zip(valid_indices, valid_cited_ids)}
 
     return data, valid_cited_ids
@@ -450,6 +501,28 @@ def update_graph_with_content(graph):
     
     return graph
 
+def build_citation_tree_with_ids(root_arxiv_id, paper_title):
+    try:
+        main_text = get_arxiv_main_text(root_arxiv_id)
+        abstract = get_arxiv_abstract(root_arxiv_id)
+
+        cited_titles = extract_reference_titles(root_arxiv_id, main_text or '')
+        cited_arxiv_ids = get_arxiv_ids(cited_titles)
+
+        graph, valid_cited_ids = construct_citation_graph(root_arxiv_id, paper_title, cited_titles, cited_arxiv_ids)
+
+        graph.content = [main_text]
+        graph.abstract = [abstract]
+        graph.title = [paper_title]
+
+        for _, title in zip(valid_cited_ids, [cited_titles[i] for i in graph.citation_to_graph_index.keys()]):
+                graph.content.append(None)
+                graph.abstract.append(None)
+                graph.title.append(title)
+        return graph
+    except Exception:
+        return None
+    
 def build_citation_tree(root_arxiv_id, paper_title):
     try:
         main_text = get_arxiv_main_text(root_arxiv_id)
@@ -482,7 +555,36 @@ def build_citation_tree(root_arxiv_id, paper_title):
     except Exception as e:
         print(f"Error building citation tree for {paper_title}: {str(e)}")
         return None
+    
+def merge_graphs(graphs):
+    merged_data = Data()
+    merged_data.arxiv_id = []
+    merged_data.title = []
+    merged_data.content = []
+    merged_data.abstract = []
+    merged_data.comment = []
+    merged_data.decision = []
+    merged_data.edge_index = []
 
-### Example Usage:
-# root_arxiv_id = get_arxiv_id(root_title)
-# citation_tree = build_citation_tree(root_arxiv_id, root_title)
+    arxiv_id_to_index = {}
+    current_index = 0
+
+    for graph in graphs:
+        for i, arxiv_id in enumerate(graph.arxiv_ids):
+            if arxiv_id not in arxiv_id_to_index:
+                arxiv_id_to_index[arxiv_id] = current_index
+                merged_data.arxiv_id.append(arxiv_id)
+                merged_data.title.append(graph.titles[i])
+                merged_data.content.append(graph.content[i])
+                merged_data.abstract.append(graph.abstract[i])
+                merged_data.comment.append(graph.comment[i] if hasattr(graph, 'comment') else None)
+                merged_data.decision.append(graph.decision[i] if hasattr(graph, 'decision') else None)
+                current_index += 1
+
+        for edge in graph.edge_index.t():
+            source = arxiv_id_to_index[graph.arxiv_ids[edge[0]]]
+            target = arxiv_id_to_index[graph.arxiv_ids[edge[1]]]
+            merged_data.edge_index.append([source, target])
+
+    merged_data.edge_index = torch.tensor(merged_data.edge_index).t().contiguous()
+    return merged_data

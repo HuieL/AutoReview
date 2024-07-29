@@ -18,6 +18,7 @@ import backoff
 
 #### Parse Json file
 def process_conferences(base_folder, output_folder):
+    os.makedirs(output_folder, exist_ok=True)
     for conference_folder in os.listdir(base_folder):
         if os.path.exists(f"{output_folder}/{conference_folder}.pt"):
             print(f"Citation graph for '{conference_folder}' already exists. Skipping.")

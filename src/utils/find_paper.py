@@ -569,7 +569,7 @@ def merge_graphs(graphs):
     original_nodes = 0
 
     for graph in graphs:
-        original_nodes += len(graph.x[0])
+        original_nodes += len(graph.arxiv_ids)
         for i, arxiv_id in enumerate(graph.arxiv_ids):
             if arxiv_id not in arxiv_id_to_index:
                 arxiv_id_to_index[arxiv_id] = current_index

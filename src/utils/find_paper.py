@@ -71,7 +71,7 @@ def process_conference(conference_folder):
             if graph is not None:
                 graph.comment = [reviews] + [None] * (len(graph.arxiv_ids) - 1)
                 graph.decision = [paper_info.get('decision')] + [None] * (len(graph.arxiv_ids) - 1)
-                save_graph(graph, f"{conference_folder}_cached/{file}.pt", conference_folder)
+                torch.save(graph, f"{conference_folder}_cached/{file}.pt")
                 graphs.append(graph)
         except: 
             continue

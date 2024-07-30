@@ -43,32 +43,36 @@ def process_conference(conference_folder):
     review_folder = os.path.join(conference_folder, f"{os.path.basename(conference_folder)}_review")
     graphs = []
 
+    os.makedirs(f"{conference_folder}_cached", exist_ok=True)
     content_files = [f for f in os.listdir(content_folder) if f.endswith('_content.json')]
     for file in tqdm(content_files, desc=f"Processing {os.path.basename(conference_folder)}", unit="paper"):
+        if os.path.exists(f"{conference_folder}_cached/{file}.pt"):
+            graphs.append(torch.load(f"{conference_folder}_cached/{file}.pt"))
+            continue
         try:
-            if file.endswith('_content.json'):
-                paper_id = file.split('_content.json')[0]
-                paper_file = os.path.join(paper_folder, f"{paper_id}_paper.json")
-                review_file = os.path.join(review_folder, f"{paper_id}_review.json")
+            paper_id = file.split('_content.json')[0]
+            paper_file = os.path.join(paper_folder, f"{paper_id}_paper.json")
+            review_file = os.path.join(review_folder, f"{paper_id}_review.json")
 
-                if not (os.path.exists(paper_file) and os.path.exists(review_file)):
-                    continue
+            if not (os.path.exists(paper_file) and os.path.exists(review_file)):
+                continue
 
-                paper_info = load_paper_info(paper_file)
-                reviews = load_review_info(review_file)
+            paper_info = load_paper_info(paper_file)
+            reviews = load_review_info(review_file)
 
-                title = paper_info.get('title')
-                arxiv_id = get_arxiv_id(title)
-                
-                if not arxiv_id:
-                    continue
+            title = paper_info.get('title')
+            arxiv_id = get_arxiv_id(title)
+            
+            if not arxiv_id:
+                continue
 
-                graph = build_citation_tree_with_ids(arxiv_id, title)
-                
-                if graph is not None:
-                    graph.comment = [reviews] + [None] * (len(graph.arxiv_ids) - 1)
-                    graph.decision = [paper_info.get('decision')] + [None] * (len(graph.arxiv_ids) - 1)
-                    graphs.append(graph)
+            graph = build_citation_tree_with_ids(arxiv_id, title)
+            
+            if graph is not None:
+                graph.comment = [reviews] + [None] * (len(graph.arxiv_ids) - 1)
+                graph.decision = [paper_info.get('decision')] + [None] * (len(graph.arxiv_ids) - 1)
+                save_graph(graph, f"{conference_folder}_cached/{file}.pt", conference_folder)
+                graphs.append(graph)
         except: 
             continue
 
@@ -215,10 +219,9 @@ def get_arxiv_abstract(arxiv_id):
         summary = entry.find('atom:summary', namespace)
         if summary is not None:
             return summary.text.strip()
-    except Exception as e:
-        print(f"Error fetching abstract for {arxiv_id}: {str(e)}")
-    return None
-
+    except Exception:
+        return None
+    
 
 ############### Utils to get references
 def process_input_commands(content, base_dir):

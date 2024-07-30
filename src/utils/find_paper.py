@@ -16,7 +16,6 @@ from requests.exceptions import RequestException
 import backoff
 
 
-#### Parse Json file
 def process_conferences(base_folder, output_folder):
     os.makedirs(output_folder, exist_ok=True)
     for conference_folder in os.listdir(base_folder):
@@ -46,17 +45,13 @@ def process_conference(conference_folder):
     os.makedirs(f"{conference_folder}_cached", exist_ok=True)
     content_files = [f for f in os.listdir(content_folder) if f.endswith('_content.json')]
     for file in tqdm(content_files, desc=f"Processing {os.path.basename(conference_folder)}", unit="paper"):
-        if os.path.exists(f"{conference_folder}_cached/{file}.pt"):
-            graphs.append(torch.load(f"{conference_folder}_cached/{file}.pt"))
-            continue
-        try:
-            paper_id = file.split('_content.json')[0]
-            paper_file = os.path.join(paper_folder, f"{paper_id}_paper.json")
-            review_file = os.path.join(review_folder, f"{paper_id}_review.json")
-
-            if not (os.path.exists(paper_file) and os.path.exists(review_file)):
+        paper_id = file.split('_content.json')[0]
+        paper_file = os.path.join(paper_folder, f"{paper_id}_paper.json")
+        review_file = os.path.join(review_folder, f"{paper_id}_review.json")
+        if os.path.exists(f"{conference_folder}_cached/{paper_id}.pt"):
+                graphs.append(torch.load(f"{conference_folder}_cached/{paper_id}.pt"))
                 continue
-
+        try:
             paper_info = load_paper_info(paper_file)
             reviews = load_review_info(review_file)
 
@@ -67,11 +62,10 @@ def process_conference(conference_folder):
                 continue
 
             graph = build_citation_tree_with_ids(arxiv_id, title)
-            
             if graph is not None:
                 graph.comment = [reviews] + [None] * (len(graph.arxiv_ids) - 1)
                 graph.decision = [paper_info.get('decision')] + [None] * (len(graph.arxiv_ids) - 1)
-                torch.save(graph, f"{conference_folder}_cached/{file}.pt")
+                torch.save(graph, f"{conference_folder}_cached/{paper_id}.pt")
                 graphs.append(graph)
         except: 
             continue
@@ -81,6 +75,7 @@ def process_conference(conference_folder):
 def save_graph(graphs, output_folder, conference_folder):
     conference_graph = merge_graphs(graphs)
     torch.save(conference_graph, f"{output_folder}/{conference_folder}.pt")
+
 
 ### Utils to extract contents from arxiv
 @backoff.on_exception(backoff.expo, requests.exceptions.RequestException, max_tries=5)

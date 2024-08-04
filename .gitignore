@@ -1,4 +1,4 @@
 # ignore adding dataset files and temp files
-dataset/ICLR_2017/*
-dataset/ICLR_2017_cached/*
+dataset/*
+processed/*
 src/utils/__pycache__/*

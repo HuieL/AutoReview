@@ -23,8 +23,9 @@ def process_conferences(base_folder, output_folder):
             print(f"Citation graph for '{conference_folder}' already exists. Skipping.")
             continue
         if os.path.isdir(os.path.join(base_folder, conference_folder)):
-            conference_graphs = process_conference(os.path.join(base_folder, conference_folder))
-            save_graph(conference_graphs, output_folder, conference_folder)
+            if "_cached" not in conference_folder:
+                conference_graphs = process_conference(os.path.join(base_folder, conference_folder))
+                save_graph(conference_graphs, output_folder, conference_folder)
 
 def load_paper_info(file_path):
     with open(file_path, 'r') as f:

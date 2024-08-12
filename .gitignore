@@ -2,3 +2,5 @@
 dataset/*
 processed/*
 src/utils/__pycache__/*
+
+.env

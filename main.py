@@ -3,7 +3,7 @@ import os
 
 path = os.getcwd()
 sys.path.append(os.path.abspath(path + "/src/utils"))
-from find_paper import *
+from src.utils.find_paper import *
 
 def main():
     base_folder = path + "/dataset"

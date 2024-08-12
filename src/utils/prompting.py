@@ -1,6 +1,6 @@
 from typing import List, Dict, Any
 import tiktoken
-from src.model.prompt import FINDING_AREA_PROMPT, ASPECT_PROMPT, ASPECT_WRITING_PROMPT
+from src.model.prompt import FINDING_AREA_PROMPT, ASPECT_PROMPT, ASPECT_WRITING_PROMPT, MERGING_ASPECTS_PROMPT
 
 
 def area_finding_prompt(paper: Dict[str, Any], domain_number: int = 5) -> str:
@@ -27,6 +27,16 @@ def aspect_writing_prompt(paper: Dict[str, Any], domain: str, aspect: str) -> st
         raise ValueError("Paper has no content or abstract.")
     
     prompt = ASPECT_WRITING_PROMPT.replace('[PAPER]', paper_content)
+    prompt = prompt.replace('[Domain]', str(domain))
+    prompt = prompt.replace('[ASPECT]', str(aspect))
+    return prompt
+
+def merged_aspect_prompt(paper: Dict[str, Any], domain: str, aspect: str) -> str:
+    paper_content = paper['content'] if paper['content'] else paper['abstract']
+    if not paper_content:
+        raise ValueError("Paper has no content or abstract.")
+    
+    prompt = MERGING_ASPECTS_PROMPT.replace('[PAPER]', paper_content)
     prompt = prompt.replace('[Domain]', str(domain))
     prompt = prompt.replace('[ASPECT]', str(aspect))
     return prompt

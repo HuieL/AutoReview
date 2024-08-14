@@ -63,8 +63,15 @@ with open('merged_aspects.txt', 'w', encoding='utf-8') as f:
 prompts = [aspect_writing_prompt(random_paper, domains[0], merged_aspects[0])]
 outputs = model.batch_chat(text_batch=prompts, temperature=1)
 
-with open('merged_aspect_comments.txt', 'w', encoding='utf-8') as f:
+with open('merged_aspect_comments_0.txt', 'w', encoding='utf-8') as f:
     f.write(f"\n\n{'-'*200}\n\n".join(outputs))
+
+for i in range(1, 5, 1):
+    file_name = 'merged_aspects_comments_' + str(i) + '.txt'
+    prompts = [aspect_writing_prompt(random_paper, domains[i], merged_aspects[0])]
+    outputs = model.batch_chat(text_batch=prompts, temperature=1)
+    with open(file_name, 'w', encoding='utf-8') as f:
+        f.write(f"\n\n{'-'*200}\n\n".join(outputs))
 
 # You can use these test codes in a notebook to quickly start...
 # You can check the aspects in the .txt file extracted...

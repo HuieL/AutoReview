@@ -72,30 +72,31 @@ Output:
 
 MERGING_ASPECTS_PROMPT = '''
 You are an expert reviewer in the field of [DOMAIN]. 
-You have been asked to provide a detailed evaluation of a specific aspect of a research paper. 
+You have been asked to merge similar aspects of a research paper if possible. 
 Here is the content of the research paper:
 ---
 [PAPER]
 ---
 The list of relevant aspects that are already given for this paper are as follows:
 ---
-Aspect 1: [Aspect Description]
-
-...
-
-Aspect K: [Aspect Description]
+[ASPECT]
 ---
 
 <instruction>
 Based on these given aspects and the paper content, determine whether the aspects and their desciptions are similar enough with each other, and merge these two aspects together by:
 1. Assess the similarities between the two descriptions and the aspect title.
-2. If similar enough, return the merged description and rename the two merged aspects with the format.
-Your evaluation should be thorough, balanced, and insightful, reflecting your expertise in [DOMAIN]. Aim for a response of approximately 200-300 words.
-Return your evaluation in the following format:
-<evaluation>
-If merged: [ASPECT_1]/[ASPECT_2]: [Aspect description]
-Else: Leave the aspect as it was before ([ASPECT]: [Aspect description])
-</evaluation>
+2. If similar enough, return the merged description and rename the two merged aspects with the format. Otherwise, leave the aspect and its corresponding description as is.
+3. Continue with the rest of the dataset, and if more aspects are similar enough, merge these aspects all together.
+The new merged aspect should have a new summarized name of the two merged aspects and a new summary.
+Return your final evaluation in the following format:
+<format>
+Merged aspect 1: [Merged aspect description]
+
+...
+
+Merged aspect J: [Merged aspect description]
+</format>
+Where J must be less than or equal to K, the number of original aspects provided.
 </instruction>
 Output:
 '''

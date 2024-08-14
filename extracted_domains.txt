@@ -1,0 +1,7 @@
+<format>
+Domain 1: Machine Learning (LG)
+Domain 2: Neural and Evolutionary Computing (NE)
+Domain 3: Computer Vision and Pattern Recognition (CV)
+Domain 4: Artificial Intelligence (AI)
+Domain 5: Computation and Language (CL)
+<format>

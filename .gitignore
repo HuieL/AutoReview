@@ -1,1 +1,7 @@
+# ignore adding dataset files and temp files
+dataset/*
+src/utils/__pycache__/*
+src/model/__pycache__/*
+
+# sensitive environmental files
 .env

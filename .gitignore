@@ -1,6 +1,5 @@
 # ignore adding dataset files and temp files
 dataset/*
-processed/*
 src/utils/__pycache__/*
 src/model/__pycache__/*
 

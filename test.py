@@ -1,4 +1,3 @@
-
 import torch
 from src.utils.prompting import *
 from src.utils.load_data import CitationGraph
@@ -18,7 +17,6 @@ def select_random_paper_with_comment(dataset: CitationGraph) -> Dict[str, Any]:
     if not papers_with_comments:
         raise ValueError("No papers with comments found in the database.")
     random_index = random.choice(papers_with_comments)
-    print(random_index)
     return dataset[random_index]
 
 
@@ -35,10 +33,10 @@ prompts = [area_finding_prompt]
 outputs = model.batch_chat(text_batch=prompts, temperature=1)
 domains = extract_domains(outputs)
 
+
 with open('extracted_domains.txt', 'w', encoding='utf-8') as f:
     f.write(f"\n\n{'-'*200}\n\n".join(outputs))
 
-# For instance, we select the first and the third specialized domains to output detailed aspects ...
 prompts = [topic_finding_prompt(random_paper, domains[0])]
 outputs = model.batch_chat(text_batch=prompts, temperature=1)
 aspects = extract_aspects(outputs)
@@ -72,8 +70,3 @@ for i in range(1, 5, 1):
     outputs = model.batch_chat(text_batch=prompts, temperature=1)
     with open(file_name, 'w', encoding='utf-8') as f:
         f.write(f"\n\n{'-'*200}\n\n".join(outputs))
-
-# You can use these test codes in a notebook to quickly start...
-# You can check the aspects in the .txt file extracted...
-# Then, aspect_writing_prompt() to merge these aspects from different domain perspective...
-# You need to check the output and adjust the prompts ...
